@@ -24,7 +24,7 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/lexical_cast.hpp>
 //#include <boost/application/limit_single_instance.hpp>
-#include <boost/interprocess/shared_memory_object.hpp>
+#include <boost/interprocess/sync/named_mutex.hpp>
 #include <boost/scoped_ptr.hpp>
 
 #include <cstdlib>
@@ -61,19 +61,18 @@ namespace boost { namespace application {
          try
          {
             create_shared_memory_or_die_.reset(
-               new interprocess::shared_memory_object(
-               interprocess::create_only, name_.c_str(),
-               interprocess::read_write));
+               new interprocess::named_mutex(
+               interprocess::create_only, name_.c_str()));
 
-            owns_lock_ = false; // we lock now
+            owns_lock_ = true; // we lock now
          }
          catch(...)
          {
             // executable is already running
-            owns_lock_ = true;
+            owns_lock_ = false;
          }
 
-         return owns_lock_;
+         return !owns_lock_;
       }
 
       void release(bool force = false)
@@ -83,8 +82,8 @@ namespace boost { namespace application {
          }
          
          // if I create it, I can remove it
-         if(owns_lock_ == true) {
-            interprocess::shared_memory_object::remove(name_.c_str());
+         if(owns_lock_) {
+             create_shared_memory_or_die_.reset();
          }
 
          owns_lock_ = false;
@@ -92,7 +91,7 @@ namespace boost { namespace application {
 
       bool is_another_instance_running()
       {
-         return owns_lock_;
+         return !owns_lock_;
       }
 
    private:
@@ -100,7 +99,7 @@ namespace boost { namespace application {
       string_type name_;
 
       boost::
-         scoped_ptr<interprocess::shared_memory_object> create_shared_memory_or_die_;
+         scoped_ptr<interprocess::named_mutex> create_shared_memory_or_die_;
 
       bool owns_lock_;
    };
