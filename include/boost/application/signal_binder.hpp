@@ -55,10 +55,6 @@ namespace boost { namespace application {
          , io_service_thread_(0)
          , context_(cxt)
       {
-         signals_.async_wait(
-            boost::bind(&signal_binder::signal_handler, this,
-            boost::asio::placeholders::error,
-            boost::asio::placeholders::signal_number));
       }
 
       explicit signal_binder(global_context_ptr cxt)
@@ -66,10 +62,6 @@ namespace boost { namespace application {
          , io_service_thread_(0)
          , context_(*cxt.get())
       {
-         signals_.async_wait(
-            boost::bind(&signal_binder::signal_handler, this,
-            boost::asio::placeholders::error,
-            boost::asio::placeholders::signal_number));
       }
 
       virtual ~signal_binder()
@@ -202,6 +194,13 @@ namespace boost { namespace application {
       }
 
     protected:
+      void async_wait_signals()
+      {
+         signals_.async_wait(
+            boost::bind(&signal_binder::signal_handler, this,
+            boost::asio::placeholders::error,
+            boost::asio::placeholders::signal_number));
+      }
 
       void start()
       {
@@ -284,6 +283,7 @@ namespace boost { namespace application {
          : signal_binder(context)
       {
          register_signals(ec);
+         async_wait_signals();
       }
 
       signal_manager(application::context &context)
@@ -292,6 +292,7 @@ namespace boost { namespace application {
          boost::system::error_code ec;
 
          register_signals(ec);
+         async_wait_signals();
 
          if(ec)
             BOOST_APPLICATION_THROW_LAST_SYSTEM_ERROR_USING_MY_EC(

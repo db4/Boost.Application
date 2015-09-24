@@ -87,6 +87,9 @@ namespace boost { namespace application {
          : application_impl(context)
          , main_(main)
       {
+         // Handle boost::asio::io_service according to
+         // http://www.boost.org/doc/libs/1_58_0/doc/html/boost_asio/example/cpp03/fork/daemon.cpp
+         sb.io_service_.notify_fork(boost::asio::io_service::fork_prepare);
          // ver 1
 #if defined( USE_DAEMONIZE_VER_1 )
          process_id_ = daemonize(ec);
@@ -99,7 +102,8 @@ namespace boost { namespace application {
          
          process_id_ = getpid();
 #endif
-         
+         sb.io_service_.notify_fork(boost::asio::io_service::fork_child);
+             
          sb.start(); // need be started after daemonize
       }
 
@@ -260,7 +264,6 @@ namespace boost { namespace application {
 
          // Ensure future opens won't allocate controlling TTYs.
 
-         struct rlimit rl;
          struct sigaction sa;
 
          sa.sa_handler = SIG_IGN;
@@ -291,13 +294,9 @@ namespace boost { namespace application {
             ec = last_error_code();
          }
 
-         // close all open file descriptors.
-         if (rl.rlim_max == RLIM_INFINITY)
-         {
-            rl.rlim_max = 1024;
-         }
-
-         for (int i = 0; i < (int)rl.rlim_max; i++)
+         // Close the standard streams. Don't close others as e.g.
+         // boost::asio::io_service may have already opened some
+         for (int i = 0; i < 3; i++)
          {
             close(i);
          }
